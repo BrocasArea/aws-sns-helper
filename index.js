@@ -87,7 +87,8 @@ class SNSHelper {
                             "body": message,
                             ...title ? { title } : {},
                         },
-                        sound: "default"
+                        sound: "default",
+                        "content-available" : 1
                     },
                     ...messageAttributes
                 }
