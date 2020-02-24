@@ -113,10 +113,6 @@ class SNSHelper {
                         //     'message': message,
                         //     ...title ? { title } : {},
                         // }
-                        'notification': {
-                            'text': message,
-                            ...title ? { title } : {},
-                        },
                         'data': {
                             'message': message,
                             ...title ? { title } : {},
