@@ -69,7 +69,7 @@ class SNSHelper {
         let { platform, devicePlatform, deviceToken, message, notification, notifyCount, messageAttributes, title } = props;
         let result;
         let endpoint;
-        let data;
+        let dataArr;
 
         messageAttributes = {
             ...this.messageAttributes,
@@ -81,47 +81,64 @@ class SNSHelper {
             let platformArn = this.getPlatformArn(platform);
 
             if (platform.startsWith("APNS")) {
-                data = {
-                    aps: {
-                        alert: {
-                            "body": message,
-                            ...title ? { title } : {},
+                dataArr = [
+                    // 一般推播
+                    {
+                        aps: {
+                            alert: {
+                                "body": message,
+                                ...title ? { title } : {},
+                            },
+                            sound: "default",
                         },
-                        sound: "default",
-                        "content-available" : 1
+                        ...messageAttributes
                     },
-                    ...messageAttributes
-                }
+                    // 靜默推播
+                    {
+                        aps: {
+                            alert: {
+                                "body": message,
+                                ...title ? { title } : {},
+                            },
+                            sound: "default",
+                            "content-available" : 1
+                        },
+                        ...messageAttributes
+                    }
+                ];
             } else if (platform.startsWith("GCM")) {
-                data = {}
+                dataArr = []
                 if (devicePlatform == null) devicePlatform = "android";
 
                 if (devicePlatform == "ios") {
-                    data = {
-                        // 'title': '123123',
-                        'notification': {
-                            'text': message,
-                            ...title ? { title } : {},
+                    dataArr = [
+                        {
+                            // 'title': '123123',
+                            'notification': {
+                                'text': message,
+                                ...title ? { title } : {},
+                            },
+                            'data': {
+                                ...messageAttributes,
+                            }
                         },
-                        'data': {}
-                    }
+                    ]
 
                 } else if (devicePlatform == "android") {
-                    data = {
-                        // 舊版 ＧCM 推播
-                        // 'data': {
-                        //     'message': message,
-                        //     ...title ? { title } : {},
-                        // }
-                        'data': {
-                            'message': message,
-                            ...title ? { title } : {},
+                    dataArr = [
+                            {
+                            // 舊版 ＧCM 推播
+                            // 'data': {
+                            //     'message': message,
+                            //     ...title ? { title } : {},
+                            // }
+                            'data': {
+                                'message': message,
+                                ...title ? { title } : {},
+                                ...messageAttributes,
+                            }
                         }
-                    }
-                }
-                data.data = {
-                    ...data.data,
-                    ...messageAttributes
+                    ]
                 }
             }
 
@@ -132,7 +149,7 @@ class SNSHelper {
                 console.info('---- 非 production mode, 不寄通知');
                 return {
                     result: { success: 'fake result' },
-                    message: data
+                    message: dataArr
                 };
             }
 
@@ -142,28 +159,28 @@ class SNSHelper {
             }).promise();
             debug('pushAPNS createPlatformEndpoint %j', endpoint);
 
-            let payload = JSON.stringify(data);
-            let msgToSend = this.getMsgToSend(platform, payload);
-            console.log("=== payload ===", payload);
-            // 參數參考 http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/SNS.html#publish-property
-            let publishParams = {
-                Message: JSON.stringify(msgToSend),
-                MessageStructure: 'json',
-                TargetArn: endpoint.EndpointArn
-            };
+            const results = dataArr.map(async data => {
+                let payload = JSON.stringify(data);
+                let msgToSend = this.getMsgToSend(platform, payload);
+                console.log("=== payload ===", payload);
+                // 參數參考 http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/SNS.html#publish-property
+                let publishParams = {
+                    Message: JSON.stringify(msgToSend),
+                    MessageStructure: 'json',
+                    TargetArn: endpoint.EndpointArn
+                };
 
+                publishParams.MessageAttributes = messageAttributes;
+                result = await this.SNS.publish(publishParams).promise();
 
+                return {
+                    result: result,
+                    message: data,
+                    success: true
+                };
+            });
 
-
-            publishParams.MessageAttributes = messageAttributes;
-
-            result = await this.SNS.publish(publishParams).promise();
-
-            return {
-                result: result,
-                message: data,
-                success: true
-            };
+            return results[0];
         } catch (err) {
             debug('pushAPNS error %j', err);
 
