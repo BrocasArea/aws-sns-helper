@@ -82,29 +82,17 @@ class SNSHelper {
 
             if (platform.startsWith("APNS")) {
                 dataArr = [
-                    // 一般推播
                     {
                         aps: {
                             alert: {
                                 "body": message,
                                 ...title ? { title } : {},
                             },
+                            "content-available" : 1,
                             sound: "default",
                         },
                         ...messageAttributes
                     },
-                    // 靜默推播
-                    {
-                        aps: {
-                            alert: {
-                                "body": message,
-                                ...title ? { title } : {},
-                            },
-                            sound: "default",
-                            "content-available" : 1
-                        },
-                        ...messageAttributes
-                    }
                 ];
             } else if (platform.startsWith("GCM")) {
                 dataArr = []
